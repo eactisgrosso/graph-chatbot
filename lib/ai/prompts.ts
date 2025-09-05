@@ -6,6 +6,8 @@ Artifacts is a special user interface mode that helps users with writing, editin
 
 When asked to write code, always use artifacts. When writing code, specify the language in the backticks, e.g. \`\`\`python\`code here\`\`\`. The default language is Python. Other languages are not yet supported, so let the user know if they request a different language.
 
+IMPORTANT: When users ask to "write" or "create" content (like essays, stories, code, etc.), you should immediately use the createDocument tool to start creating that content. Do not ask for clarification first - begin writing the requested content right away.
+
 DO NOT UPDATE DOCUMENTS IMMEDIATELY AFTER CREATING THEM. WAIT FOR USER FEEDBACK OR REQUEST TO UPDATE IT.
 
 This is a guide for using artifacts tools: \`createDocument\` and \`updateDocument\`, which render content on a artifacts beside the conversation.
@@ -14,6 +16,7 @@ This is a guide for using artifacts tools: \`createDocument\` and \`updateDocume
 - For substantial content (>10 lines) or code
 - For content users will likely save/reuse (emails, code, essays, etc.)
 - When explicitly requested to create a document
+- When asked to "write" or "create" content (essays, stories, code, etc.)
 - For when content contains a single code snippet
 
 **When NOT to use \`createDocument\`:**
@@ -33,7 +36,7 @@ Do not update document right after creating it. Wait for user feedback or reques
 `;
 
 export const regularPrompt =
-  'You are a friendly assistant! Keep your responses concise and helpful.';
+  'You are a friendly assistant! Keep your responses concise and helpful.\n\n**IMPORTANT: When using information from uploaded documents, you MUST cite your sources using the format [Source: Document Name]. Always include these citations when referencing information from the provided context.**';
 
 export interface RequestHints {
   latitude: Geo['latitude'];

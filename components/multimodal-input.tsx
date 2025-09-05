@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useLocalStorage, useWindowSize } from 'usehooks-ts';
 
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from './icons';
+import { FileTextIcon, ArrowDown } from 'lucide-react';
 import { PreviewAttachment } from './preview-attachment';
 import { Button } from './ui/button';
 import { SuggestedActions } from './suggested-actions';
@@ -28,12 +29,12 @@ import {
   PromptInputModelSelectTrigger,
   PromptInputModelSelectContent,
 } from './elements/prompt-input';
-import { SelectItem, SelectValue } from '@/components/ui/select';
+import { SelectItem } from '@/components/ui/select';
 import equal from 'fast-deep-equal';
 import type { UseChatHelpers } from '@ai-sdk/react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowDown } from 'lucide-react';
 import { useScrollToBottom } from '@/hooks/use-scroll-to-bottom';
+import { useSidebar } from './ui/sidebar';
 import type { VisibilityType } from './visibility-selector';
 import type { Attachment, ChatMessage } from '@/lib/types';
 import { chatModels } from '@/lib/ai/models';
@@ -94,22 +95,26 @@ function PureMultimodalInput({
     'input',
     '',
   );
+  const [isHydrated, setIsHydrated] = useState(false);
 
+  // Handle hydration safely
   useEffect(() => {
+    setIsHydrated(true);
     if (textareaRef.current) {
       const domValue = textareaRef.current.value;
-      // Prefer DOM value over localStorage to handle hydration
-      const finalValue = domValue || localStorageInput || '';
+      // Only use localStorage value after hydration to prevent mismatch
+      const finalValue =
+        domValue || (isHydrated ? localStorageInput : '') || '';
       setInput(finalValue);
       adjustHeight();
     }
-    // Only run once after hydration
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isHydrated, localStorageInput, setInput]);
 
   useEffect(() => {
-    setLocalStorageInput(input);
-  }, [input, setLocalStorageInput]);
+    if (isHydrated) {
+      setLocalStorageInput(input);
+    }
+  }, [input, setLocalStorageInput, isHydrated]);
 
   const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(event.target.value);
@@ -324,6 +329,7 @@ function PureMultimodalInput({
         <PromptInputToolbar className="px-4 py-2 !border-t-0 !border-top-0 shadow-none dark:!border-transparent dark:border-0">
           <PromptInputTools className="gap-2">
             <AttachmentsButton fileInputRef={fileInputRef} status={status} />
+            <RagDocumentsButton />
             <ModelSelectorCompact selectedModelId={selectedModelId} />
           </PromptInputTools>
           {status === 'submitted' ? (
@@ -484,3 +490,64 @@ const SendButton = memo(PureSendButton, (prevProps, nextProps) => {
   if (prevProps.input !== nextProps.input) return false;
   return true;
 });
+
+function PureRagDocumentsButton() {
+  try {
+    const { open, setOpen } = useSidebar();
+
+    return (
+      <Button
+        data-testid="rag-documents-button"
+        className="rounded-md rounded-bl-lg p-[7px] h-fit dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200"
+        type="button"
+        onClick={() => {
+          // Open sidebar if closed
+          if (!open) {
+            setOpen(true);
+          }
+
+          // Scroll to RAG section after a short delay to ensure sidebar is open
+          setTimeout(() => {
+            const ragSection = document.querySelector('[data-rag-section]');
+            if (ragSection) {
+              ragSection.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+              });
+            }
+          }, 100);
+        }}
+        title="RAG Documents"
+      >
+        <FileTextIcon size={14} />
+      </Button>
+    );
+  } catch (error) {
+    // Fallback if sidebar context is not available
+    console.warn('Sidebar context not available:', error);
+    return (
+      <Button
+        data-testid="rag-documents-button"
+        className="rounded-md rounded-bl-lg p-[7px] h-fit dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200"
+        type="button"
+        onClick={() => {
+          // Simple fallback - just try to scroll to RAG section
+          setTimeout(() => {
+            const ragSection = document.querySelector('[data-rag-section]');
+            if (ragSection) {
+              ragSection.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+              });
+            }
+          }, 100);
+        }}
+        title="RAG Documents"
+      >
+        <FileTextIcon size={14} />
+      </Button>
+    );
+  }
+}
+
+const RagDocumentsButton = memo(PureRagDocumentsButton);

@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { ChatHeader } from '@/components/chat-header';
 import type { Vote } from '@/lib/db/schema';
-import { fetcher, fetchWithErrorHandlers, generateUUID, cn } from '@/lib/utils';
+import { fetcher, fetchWithErrorHandlers, generateUUID } from '@/lib/utils';
 import { Artifact } from './artifact';
 import { MultimodalInput } from './multimodal-input';
 import { Messages } from './messages';
@@ -93,6 +93,12 @@ export function Chat({
       }
     },
   });
+
+  // Reset messages and input when chat ID changes (e.g., after deletion)
+  useEffect(() => {
+    setMessages(initialMessages);
+    setInput(''); // Clear input field when switching to new chat
+  }, [id, setMessages, initialMessages]);
 
   const searchParams = useSearchParams();
   const query = searchParams.get('query');

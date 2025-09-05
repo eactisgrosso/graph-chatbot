@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { PlusIcon } from '@/components/icons';
 import { SidebarHistory } from '@/components/sidebar-history';
 import { SidebarUserNav } from '@/components/sidebar-user-nav';
+import { RagDocumentsList } from '@/components/rag-documents-list';
+import { RagDocumentUpload } from '@/components/rag-document-upload';
 import { Button } from '@/components/ui/button';
 import {
   Sidebar,
@@ -60,6 +62,17 @@ export function AppSidebar({ user }: { user: User | undefined }) {
       </SidebarHeader>
       <SidebarContent>
         <SidebarHistory user={user} />
+        {user && (
+          <div className="p-4 border-t space-y-4" data-rag-section>
+            <RagDocumentUpload
+              onDocumentUploaded={() => {
+                // Trigger a custom event to refresh the documents list
+                window.dispatchEvent(new CustomEvent('rag-documents-refresh'));
+              }}
+            />
+            <RagDocumentsList />
+          </div>
+        )}
       </SidebarContent>
       <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>
     </Sidebar>

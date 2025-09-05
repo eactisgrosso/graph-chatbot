@@ -23,6 +23,7 @@ import { createDocument } from '@/lib/ai/tools/create-document';
 import { updateDocument } from '@/lib/ai/tools/update-document';
 import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
+import { searchRelevantChunks } from '@/lib/rag/utils';
 import { isProductionEnvironment } from '@/lib/constants';
 import { myProvider } from '@/lib/ai/providers';
 import { entitlementsByUserType } from '@/lib/ai/entitlements';
@@ -133,6 +134,39 @@ export async function POST(request: Request) {
       country,
     };
 
+    // Extract text from user message for RAG search
+    const userMessageText = message.parts
+      .filter((part) => part.type === 'text')
+      .map((part) => part.text)
+      .join(' ');
+
+    // Search for relevant chunks using RAG
+    let ragContext = '';
+    if (userMessageText.trim()) {
+      try {
+        const relevantChunks = await searchRelevantChunks({
+          query: userMessageText,
+          userId: session.user.id,
+          limit: 3,
+          threshold: 0.3,
+        });
+
+        if (relevantChunks.length > 0) {
+          ragContext = `\n\n**RELEVANT DOCUMENT CONTEXT:**\nThe following information is from your uploaded documents. When referencing this information in your response, you MUST cite the source using the format [Source: Document Name].\n\n${relevantChunks
+            .map(
+              (chunk, index) =>
+                `**Source ${index + 1}: ${chunk.documentTitle}**\n${chunk.content}`,
+            )
+            .join(
+              '\n\n',
+            )}\n\n**Remember: Always cite your sources when using this information!**`;
+        }
+      } catch (error) {
+        console.error('RAG search error:', error);
+        // Continue without RAG context if search fails
+      }
+    }
+
     await saveMessages({
       messages: [
         {
@@ -153,7 +187,8 @@ export async function POST(request: Request) {
       execute: ({ writer: dataStream }) => {
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
-          system: systemPrompt({ selectedChatModel, requestHints }),
+          system:
+            systemPrompt({ selectedChatModel, requestHints }) + ragContext,
           messages: convertToModelMessages(uiMessages),
           stopWhen: stepCountIs(5),
           experimental_activeTools:

@@ -36,6 +36,8 @@ function PureDocumentToolResult({
 }: DocumentToolResultProps) {
   const { setArtifact } = useArtifact();
 
+  // DocumentPreview rendered
+
   return (
     <button
       type="button"
@@ -60,7 +62,7 @@ function PureDocumentToolResult({
         setArtifact({
           documentId: result.id,
           kind: result.kind,
-          content: '',
+          content: '', // Will be fetched by SWR
           title: result.title,
           isVisible: true,
           status: 'idle',

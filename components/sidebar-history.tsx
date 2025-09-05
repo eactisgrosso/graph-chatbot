@@ -120,13 +120,22 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     : false;
 
   const handleDelete = async () => {
-    const deletePromise = fetch(`/api/chat?id=${deleteId}`, {
-      method: 'DELETE',
-    });
+    setShowDeleteDialog(false);
 
-    toast.promise(deletePromise, {
-      loading: 'Deleting chat...',
-      success: () => {
+    try {
+      const response = await fetch(`/api/chat?id=${deleteId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        console.log(
+          'Chat deleted successfully. deleteId:',
+          deleteId,
+          'current id:',
+          id,
+        );
+
+        // Update the chat history immediately
         mutate((chatHistories) => {
           if (chatHistories) {
             return chatHistories.map((chatHistory) => ({
@@ -136,15 +145,24 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
           }
         });
 
-        return 'Chat deleted successfully';
-      },
-      error: 'Failed to delete chat',
-    });
+        // If we're deleting the current chat, redirect immediately
+        if (deleteId === id) {
+          console.log(
+            'Redirecting to home page after deleting current chat...',
+          );
+          // Use window.location for a more forceful redirect
+          window.location.href = '/';
+        } else {
+          console.log('Not redirecting - deleting different chat');
+        }
 
-    setShowDeleteDialog(false);
-
-    if (deleteId === id) {
-      router.push('/');
+        toast.success('Chat deleted successfully');
+      } else {
+        toast.error('Failed to delete chat');
+      }
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+      toast.error('Failed to delete chat');
     }
   };
 

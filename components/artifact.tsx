@@ -98,6 +98,8 @@ function PureArtifact({
     fetcher,
   );
 
+  // SWR documents state logged above
+
   const [mode, setMode] = useState<'edit' | 'diff'>('edit');
   const [document, setDocument] = useState<Document | null>(null);
   const [currentVersionIndex, setCurrentVersionIndex] = useState(-1);
@@ -109,6 +111,8 @@ function PureArtifact({
       const mostRecentDocument = documents.at(-1);
 
       if (mostRecentDocument) {
+        // Loading document from DB
+
         setDocument(mostRecentDocument);
         setCurrentVersionIndex(documents.length - 1);
         setArtifact((currentArtifact) => ({

@@ -9,6 +9,7 @@ import {
   primaryKey,
   foreignKey,
   boolean,
+  vector,
 } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('User', {
@@ -168,3 +169,33 @@ export const stream = pgTable(
 );
 
 export type Stream = InferSelectModel<typeof stream>;
+
+// RAG (Retrieval-Augmented Generation) tables
+export const ragDocument = pgTable('RagDocument', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  source: varchar('source', { length: 255 }), // URL, file path, etc.
+  metadata: json('metadata'), // Additional metadata like author, date, etc.
+  userId: uuid('userId')
+    .notNull()
+    .references(() => user.id),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+});
+
+export type RagDocument = InferSelectModel<typeof ragDocument>;
+
+export const ragChunk = pgTable('RagChunk', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  documentId: uuid('documentId')
+    .notNull()
+    .references(() => ragDocument.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(),
+  embedding: vector('embedding', { dimensions: 1536 }), // OpenAI text-embedding-3-small dimensions
+  chunkIndex: text('chunkIndex').notNull(), // Position in document
+  metadata: json('metadata'), // Additional chunk metadata
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+});
+
+export type RagChunk = InferSelectModel<typeof ragChunk>;

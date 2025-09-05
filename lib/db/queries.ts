@@ -10,6 +10,7 @@ import {
   gte,
   inArray,
   lt,
+  sql,
   type SQL,
 } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
@@ -27,6 +28,8 @@ import {
   type DBMessage,
   type Chat,
   stream,
+  ragDocument,
+  ragChunk,
 } from './schema';
 import type { ArtifactKind } from '@/components/artifact';
 import { generateUUID } from '../utils';
@@ -533,6 +536,241 @@ export async function getStreamIdsByChatId({ chatId }: { chatId: string }) {
     throw new ChatSDKError(
       'bad_request:database',
       'Failed to get stream ids by chat id',
+    );
+  }
+}
+
+// RAG (Retrieval-Augmented Generation) functions
+export async function saveRagDocument({
+  title,
+  content,
+  source,
+  metadata,
+  userId,
+}: {
+  title: string;
+  content: string;
+  source?: string;
+  metadata?: any;
+  userId: string;
+}) {
+  try {
+    return await db
+      .insert(ragDocument)
+      .values({
+        title,
+        content,
+        source,
+        metadata,
+        userId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+  } catch (error) {
+    console.error('Database error in saveRagDocument:', error);
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to save RAG document',
+    );
+  }
+}
+
+export async function saveRagChunk({
+  documentId,
+  content,
+  embedding,
+  chunkIndex,
+  metadata,
+}: {
+  documentId: string;
+  content: string;
+  embedding: number[];
+  chunkIndex: string;
+  metadata?: any;
+}) {
+  try {
+    return await db
+      .insert(ragChunk)
+      .values({
+        documentId,
+        content,
+        embedding,
+        chunkIndex,
+        metadata,
+        createdAt: new Date(),
+      })
+      .returning();
+  } catch (error) {
+    console.error('Database error saving RAG chunk:', error);
+    console.error('Chunk data:', {
+      documentId,
+      content: content?.substring(0, 100),
+      embedding: embedding?.length,
+      chunkIndex,
+      metadata,
+    });
+    throw new ChatSDKError('bad_request:database', 'Failed to save RAG chunk');
+  }
+}
+
+export async function searchSimilarChunks({
+  embedding,
+  limit = 5,
+  threshold = 0.3,
+  userId,
+}: {
+  embedding: number[];
+  limit?: number;
+  threshold?: number;
+  userId?: string;
+}) {
+  try {
+    // Convert embedding array to proper vector format
+    const embeddingString = `[${embedding.join(',')}]`;
+
+    console.log(`- Query embedding length: ${embedding.length}`);
+    console.log(`- Similarity threshold: ${threshold}`);
+    console.log(`- Max results: ${limit}`);
+    console.log(`- User ID: ${userId || 'not provided'}`);
+
+    // First, let's check if there are any chunks for this user
+    const countQuery = userId
+      ? `SELECT COUNT(*) as total_chunks FROM "RagChunk" rc INNER JOIN "RagDocument" rd ON rc."documentId" = rd.id WHERE rd."userId" = '${userId}'`
+      : `SELECT COUNT(*) as total_chunks FROM "RagChunk"`;
+
+    const countResult = await client.unsafe(countQuery);
+    console.log(
+      `- Total chunks in database: ${countResult[0]?.total_chunks || 0}`,
+    );
+
+    // Build the SQL query string
+    let sqlQuery = `
+      SELECT 
+        rc.id,
+        rc.content,
+        rc."chunkIndex",
+        rc.metadata,
+        rc."documentId",
+        rd.title as "documentTitle",
+        rd.source as "documentSource",
+        1 - (rc.embedding <=> '${embeddingString}'::vector) as similarity
+      FROM "RagChunk" rc
+      INNER JOIN "RagDocument" rd ON rc."documentId" = rd.id
+      WHERE 1 - (rc.embedding <=> '${embeddingString}'::vector) > ${threshold}
+    `;
+
+    if (userId) {
+      sqlQuery += ` AND rd."userId" = '${userId}'`;
+    }
+
+    sqlQuery += `
+      ORDER BY rc.embedding <=> '${embeddingString}'::vector
+      LIMIT ${limit}
+    `;
+
+    console.log('🔍 Executing similarity search query...');
+    const result = await client.unsafe(sqlQuery);
+    console.log(`- Found ${result.length} similar chunks`);
+
+    if (result.length > 0) {
+      console.log('📄 Top similar chunks:');
+      result.forEach((chunk, index) => {
+        console.log(
+          `  ${index + 1}. Similarity: ${chunk.similarity?.toFixed(4)}, Content: "${chunk.content?.substring(0, 100)}..."`,
+        );
+      });
+    } else {
+      console.log(
+        "❌ No chunks found above threshold. Let's check what the actual similarities are...",
+      );
+
+      // Check similarities without threshold to see what we're getting
+      let debugQuery = `
+        SELECT 
+          rc.id,
+          rc.content,
+          rd.title as "documentTitle",
+          1 - (rc.embedding <=> '${embeddingString}'::vector) as similarity
+        FROM "RagChunk" rc
+        INNER JOIN "RagDocument" rd ON rc."documentId" = rd.id
+      `;
+
+      if (userId) {
+        debugQuery += ` WHERE rd."userId" = '${userId}'`;
+      }
+
+      debugQuery += `
+        ORDER BY rc.embedding <=> '${embeddingString}'::vector
+        LIMIT 5
+      `;
+
+      const debugResult = await client.unsafe(debugQuery);
+      console.log('🔍 Top 5 chunks by similarity (without threshold):');
+      debugResult.forEach((chunk, index) => {
+        console.log(
+          `  ${index + 1}. Similarity: ${chunk.similarity?.toFixed(4)}, Title: "${chunk.documentTitle}", Content: "${chunk.content?.substring(0, 50)}..."`,
+        );
+      });
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Database error searching similar chunks:', error);
+    console.error('Search parameters:', {
+      embeddingLength: embedding?.length,
+      threshold,
+      limit,
+      userId: userId ? 'provided' : 'not provided',
+    });
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to search similar chunks',
+    );
+  }
+}
+
+export async function getRagDocumentsByUserId({
+  userId,
+  limit = 50,
+}: {
+  userId: string;
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select()
+      .from(ragDocument)
+      .where(eq(ragDocument.userId, userId))
+      .orderBy(desc(ragDocument.createdAt))
+      .limit(limit);
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to get RAG documents by user id',
+    );
+  }
+}
+
+export async function deleteRagDocument({
+  documentId,
+  userId,
+}: {
+  documentId: string;
+  userId: string;
+}) {
+  try {
+    const [deletedDocument] = await db
+      .delete(ragDocument)
+      .where(
+        and(eq(ragDocument.id, documentId), eq(ragDocument.userId, userId)),
+      )
+      .returning();
+    return deletedDocument;
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to delete RAG document',
     );
   }
 }
