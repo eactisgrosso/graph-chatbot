@@ -50,7 +50,6 @@ export function Chat({
 
   const [input, setInput] = useState<string>('');
   const [kgSearchEnabled, setKgSearchEnabled] = useState<boolean>(true);
-  console.log('🔧 Chat Component - kgSearchEnabled:', kgSearchEnabled);
 
   // Use ref to store current value for transport
   const kgSearchEnabledRef = useRef(kgSearchEnabled);
@@ -58,13 +57,11 @@ export function Chat({
 
   // Create transport that uses ref for current value
   const transport = useMemo(() => {
-    console.log('🔧 Creating transport (will use ref for current value)');
     return new DefaultChatTransport({
       api: '/api/chat',
       fetch: fetchWithErrorHandlers,
       prepareSendMessagesRequest({ messages, id, body }) {
         const currentValue = kgSearchEnabledRef.current;
-        console.log('🔧 Transport - sending kgSearchEnabled:', currentValue);
         return {
           body: {
             id,

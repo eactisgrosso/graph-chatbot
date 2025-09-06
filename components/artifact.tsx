@@ -343,6 +343,8 @@ function PureArtifact({
                     setMessages={setMessages}
                     selectedVisibilityType={selectedVisibilityType}
                     selectedModelId={selectedModelId}
+                    kgSearchEnabled={true}
+                    setKgSearchEnabled={() => {}}
                   />
                 </div>
               </div>
