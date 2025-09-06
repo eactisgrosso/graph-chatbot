@@ -13,7 +13,7 @@ export async function GET(request: Request) {
       process.env.AUTH_SECRET ||
       process.env.NEXTAUTH_SECRET ||
       'fallback-secret-for-development',
-    secureCookie: !isDevelopmentEnvironment,
+    secureCookie: false, // Force insecure cookies like in development
   });
 
   if (token) {

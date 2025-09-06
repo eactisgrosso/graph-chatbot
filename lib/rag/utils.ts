@@ -234,6 +234,7 @@ export async function processDocumentForRAG({
     });
 
     await Promise.all(chunkPromises);
+    console.log(`RAG document chunks finished saving to database`);
 
     // Force garbage collection between batches
     if (global.gc) {

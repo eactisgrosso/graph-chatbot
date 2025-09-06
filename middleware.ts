@@ -23,7 +23,7 @@ export async function middleware(request: NextRequest) {
       process.env.AUTH_SECRET ||
       process.env.NEXTAUTH_SECRET ||
       'fallback-secret-for-development',
-    secureCookie: !isDevelopmentEnvironment,
+    secureCookie: false, // Force insecure cookies like in development
   });
 
   if (!token) {

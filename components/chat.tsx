@@ -49,7 +49,7 @@ export function Chat({
   const { setDataStream } = useDataStream();
 
   const [input, setInput] = useState<string>('');
-  const [kgSearchEnabled, setKgSearchEnabled] = useState<boolean>(true);
+  const [kgSearchEnabled, setKgSearchEnabled] = useState<boolean>(false);
 
   // Use ref to store current value for transport
   const kgSearchEnabledRef = useRef(kgSearchEnabled);
