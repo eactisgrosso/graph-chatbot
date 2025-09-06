@@ -2,9 +2,14 @@
 
 import type { User } from 'next-auth';
 import { useRouter } from 'next/navigation';
+import { useSWRConfig } from 'swr';
+import { unstable_serialize } from 'swr/infinite';
 
 import { PlusIcon } from '@/components/icons';
-import { SidebarHistory } from '@/components/sidebar-history';
+import {
+  SidebarHistory,
+  getChatHistoryPaginationKey,
+} from '@/components/sidebar-history';
 import { SidebarUserNav } from '@/components/sidebar-user-nav';
 import { RagDocumentsList } from '@/components/rag-documents-list';
 import { RagDocumentUpload } from '@/components/rag-document-upload';
@@ -23,6 +28,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 export function AppSidebar({ user }: { user: User | undefined }) {
   const router = useRouter();
   const { setOpenMobile } = useSidebar();
+  const { mutate } = useSWRConfig();
 
   return (
     <Sidebar className="group-data-[side=left]:border-r-0">
@@ -48,6 +54,8 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                   className="p-2 h-fit"
                   onClick={() => {
                     setOpenMobile(false);
+                    // Invalidate sidebar history cache to refresh the sidebar
+                    mutate(unstable_serialize(getChatHistoryPaginationKey));
                     router.push('/');
                     router.refresh();
                   }}
