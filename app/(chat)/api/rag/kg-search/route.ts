@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     // Search for entities in the knowledge graph
     const entities = await kgService.searchEntities(query, 5);
 
-    console.log(`📊 Found ${entities.length} entities in knowledge graph`);
+    console.log(`📊 Found ${entities.length} entities`);
 
     // Get relationships for the first entity if found
     let relationships: any[] = [];
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     // Get graph statistics
     const stats = await kgService.getGraphStats();
-    console.log('📈 Graph stats:', stats);
+    console.log('📈 Graph stats retrieved');
 
     return NextResponse.json({
       query,

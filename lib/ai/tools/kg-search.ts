@@ -17,7 +17,6 @@ export const kgSearch = tool({
   execute: async ({ query, limit = 5 }) => {
     try {
       console.log('🔍 KG Search tool called with query:', query);
-      console.log('🧬 KNOWLEDGE GRAPH SEARCH ACTIVATED!');
 
       // Ensure limit is always an integer
       const intLimit = Math.floor(Number(limit));
@@ -25,32 +24,15 @@ export const kgSearch = tool({
 
       // Search for entities in the knowledge graph
       const entities = await kgService.searchEntities(query, intLimit);
-      console.log(
-        '🔍 Raw entities from kgService:',
-        JSON.stringify(entities, null, 2),
-      );
-
       // Get relationships for found entities
       let relationships: any[] = [];
       if (entities.length > 0) {
         for (const entity of entities.slice(0, 3)) {
           // Limit to first 3 entities
-          console.log(
-            `🔗 Searching relationships for entity ID: ${entity.id} (${entity.properties.name})`,
-          );
           const entityRelationships = await kgService.getRelationships(
             entity.id,
             intLimit,
           );
-          console.log(
-            `🔗 Found ${entityRelationships.length} relationships for ${entity.properties.name}`,
-          );
-          if (entityRelationships.length > 0) {
-            console.log(
-              '🔗 Raw relationship data:',
-              JSON.stringify(entityRelationships[0], null, 2),
-            );
-          }
           relationships = relationships.concat(entityRelationships);
         }
       }
@@ -60,7 +42,7 @@ export const kgSearch = tool({
 
       // Only return results if we found entities or relationships
       if (entities.length === 0 && relationships.length === 0) {
-        console.log('🧬 No results found, not showing KG indicator');
+        console.log('🧬 No KG results found');
         return {
           query,
           entities: [],
@@ -99,32 +81,13 @@ export const kgSearch = tool({
       );
 
       if (entities.length > 0) {
-        console.log(
-          '🧬 Found entities:',
-          entities
-            .map(
-              (e) =>
-                `${e.properties?.name || 'Unknown'} (${e.labels?.[0] || 'Unknown'})`,
-            )
-            .join(', '),
-        );
+        console.log(`🧬 Found ${entities.length} entities`);
       } else {
-        console.log(
-          '🧬 No entities found in knowledge graph for query:',
-          query,
-        );
+        console.log('🧬 No entities found');
       }
 
       if (relationships.length > 0) {
-        console.log(
-          '🔗 Found relationships:',
-          relationships
-            .map(
-              (r) =>
-                `${r.startNode?.properties?.name || 'Unknown'} --${r.relationship?.type || 'Unknown'}--> ${r.endNode?.properties?.name || 'Unknown'}`,
-            )
-            .join(', '),
-        );
+        console.log(`🔗 Found ${relationships.length} relationships`);
       } else {
         console.log('🔗 No relationships found');
       }

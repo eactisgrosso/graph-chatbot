@@ -35,8 +35,13 @@ This is a guide for using artifacts tools: \`createDocument\` and \`updateDocume
 Do not update document right after creating it. Wait for user feedback or request to update it.
 `;
 
-export const regularPrompt =
-  'You are a friendly assistant specializing in biomedical and biotech topics! Keep your responses concise and helpful.\n\n**IMPORTANT: When using information from uploaded documents, you MUST cite your sources using the format [Source: Document Name]. Always include these citations when referencing information from the provided context.**\n\n**CRITICAL: KNOWLEDGE GRAPH SEARCH REQUIRED**\nFor ANY biomedical question (diseases, drugs, proteins, biological processes, relationships), you MUST use the kgSearch tool FIRST before responding. This includes questions about:\n- Insulin, glucose, diabetes, metformin\n- Protein functions and pathways\n- Drug mechanisms and interactions\n- Disease relationships and causes\n- Biological processes\n\n**ALWAYS call kgSearch tool for biomedical questions, then combine the results with document context for comprehensive answers.**\n\n**KNOWLEDGE GRAPH REFERENCE REQUIRED**\nWhen you use information from the knowledge graph search results, you MUST include a reference at the end of your response using the format: [Knowledge Graph: Biomedical Database]. This reference should appear after your main response, similar to how you cite document sources.';
+export const regularPromptBase =
+  'You are a friendly assistant specializing in biomedical and biotech topics! Keep your responses concise and helpful.\n\n**IMPORTANT: When using information from uploaded documents, you MUST cite your sources using the format [Source: Document Name]. Always include these citations when referencing information from the provided context.**';
+
+export const kgSearchInstructions =
+  '\n\n**CRITICAL: KNOWLEDGE GRAPH SEARCH REQUIRED**\nFor ANY biomedical question (diseases, drugs, proteins, biological processes, relationships), you MUST use the kgSearch tool FIRST before responding. This includes questions about:\n- Insulin, glucose, diabetes, metformin\n- Protein functions and pathways\n- Drug mechanisms and interactions\n- Disease relationships and causes\n- Biological processes\n\n**ALWAYS call kgSearch tool for biomedical questions, then combine the results with document context for comprehensive answers.**\n\n**KNOWLEDGE GRAPH REFERENCE REQUIRED**\nWhen you use information from the knowledge graph search results, you MUST include a reference at the end of your response using the format: [Knowledge Graph: Biomedical Database]. This reference should appear after your main response, similar to how you cite document sources.';
+
+export const regularPrompt = regularPromptBase + kgSearchInstructions;
 
 export interface RequestHints {
   latitude: Geo['latitude'];
@@ -56,16 +61,23 @@ About the origin of user's request:
 export const systemPrompt = ({
   selectedChatModel,
   requestHints,
+  kgSearchEnabled = true,
 }: {
   selectedChatModel: string;
   requestHints: RequestHints;
+  kgSearchEnabled?: boolean;
 }) => {
   const requestPrompt = getRequestPromptFromHints(requestHints);
 
+  // Use base prompt and conditionally add KG search instructions
+  const basePrompt = kgSearchEnabled
+    ? regularPromptBase + kgSearchInstructions
+    : regularPromptBase;
+
   if (selectedChatModel === 'chat-model-reasoning') {
-    return `${regularPrompt}\n\n${requestPrompt}`;
+    return `${basePrompt}\n\n${requestPrompt}`;
   } else {
-    return `${regularPrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`;
+    return `${basePrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`;
   }
 };
 

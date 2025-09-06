@@ -19,6 +19,7 @@ import { FileTextIcon, ArrowDown } from 'lucide-react';
 import { PreviewAttachment } from './preview-attachment';
 import { Button } from './ui/button';
 import { SuggestedActions } from './suggested-actions';
+import { KgSearchToggle } from './kg-search-toggle';
 import {
   PromptInput,
   PromptInputTextarea,
@@ -55,6 +56,8 @@ function PureMultimodalInput({
   className,
   selectedVisibilityType,
   selectedModelId,
+  kgSearchEnabled,
+  setKgSearchEnabled,
 }: {
   chatId: string;
   input: string;
@@ -69,6 +72,8 @@ function PureMultimodalInput({
   className?: string;
   selectedVisibilityType: VisibilityType;
   selectedModelId: string;
+  kgSearchEnabled: boolean;
+  setKgSearchEnabled: Dispatch<SetStateAction<boolean>>;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -124,6 +129,11 @@ function PureMultimodalInput({
   const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
 
   const submitForm = useCallback(() => {
+    // Don't submit if there's no content
+    if (!input.trim() && attachments.length === 0) {
+      return;
+    }
+
     window.history.replaceState({}, '', `/chat/${chatId}`);
 
     sendMessage({
@@ -274,6 +284,9 @@ function PureMultimodalInput({
           event.preventDefault();
           if (status !== 'ready') {
             toast.error('Please wait for the model to finish its response!');
+          } else if (!input.trim() && attachments.length === 0) {
+            // Don't submit if there's no content
+            return;
           } else {
             submitForm();
           }
@@ -330,6 +343,20 @@ function PureMultimodalInput({
           <PromptInputTools className="gap-2">
             <AttachmentsButton fileInputRef={fileInputRef} status={status} />
             <RagDocumentsButton />
+            <KgSearchToggle
+              enabled={kgSearchEnabled}
+              onToggle={(value) => {
+                console.log(
+                  '🔧 MultimodalInput - KG toggle clicked, current:',
+                  kgSearchEnabled,
+                  'new:',
+                  typeof value === 'boolean' ? value : !kgSearchEnabled,
+                );
+                setKgSearchEnabled(
+                  typeof value === 'boolean' ? value : !kgSearchEnabled,
+                );
+              }}
+            />
             <ModelSelectorCompact selectedModelId={selectedModelId} />
           </PromptInputTools>
           {status === 'submitted' ? (
@@ -358,6 +385,7 @@ export const MultimodalInput = memo(
     if (prevProps.selectedVisibilityType !== nextProps.selectedVisibilityType)
       return false;
     if (prevProps.selectedModelId !== nextProps.selectedModelId) return false;
+    if (prevProps.kgSearchEnabled !== nextProps.kgSearchEnabled) return false;
 
     return true;
   },
@@ -373,6 +401,7 @@ function PureAttachmentsButton({
   return (
     <Button
       data-testid="attachments-button"
+      type="button"
       className="rounded-md rounded-bl-lg p-[7px] h-fit dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200"
       onClick={(event) => {
         event.preventDefault();
@@ -492,21 +521,19 @@ const SendButton = memo(PureSendButton, (prevProps, nextProps) => {
 });
 
 function PureRagDocumentsButton() {
-  try {
-    const { open, setOpen } = useSidebar();
+  const { open, setOpen } = useSidebar();
 
-    return (
-      <Button
-        data-testid="rag-documents-button"
-        className="rounded-md rounded-bl-lg p-[7px] h-fit dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200"
-        type="button"
-        onClick={() => {
-          // Open sidebar if closed
-          if (!open) {
-            setOpen(true);
-          }
+  return (
+    <Button
+      data-testid="rag-documents-button"
+      variant="outline"
+      type="button"
+      onClick={() => {
+        // Toggle sidebar
+        setOpen(!open);
 
-          // Scroll to RAG section after a short delay to ensure sidebar is open
+        // If opening, scroll to RAG section after a short delay
+        if (!open) {
           setTimeout(() => {
             const ragSection = document.querySelector('[data-rag-section]');
             if (ragSection) {
@@ -516,38 +543,18 @@ function PureRagDocumentsButton() {
               });
             }
           }, 100);
-        }}
-        title="RAG Documents"
-      >
-        <FileTextIcon size={14} />
-      </Button>
-    );
-  } catch (error) {
-    // Fallback if sidebar context is not available
-    console.warn('Sidebar context not available:', error);
-    return (
-      <Button
-        data-testid="rag-documents-button"
-        className="rounded-md rounded-bl-lg p-[7px] h-fit dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200"
-        type="button"
-        onClick={() => {
-          // Simple fallback - just try to scroll to RAG section
-          setTimeout(() => {
-            const ragSection = document.querySelector('[data-rag-section]');
-            if (ragSection) {
-              ragSection.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start',
-              });
-            }
-          }, 100);
-        }}
-        title="RAG Documents"
-      >
-        <FileTextIcon size={14} />
-      </Button>
-    );
-  }
+        }
+      }}
+      className={`rounded-md rounded-bl-lg p-[7px] h-fit transition-colors ${
+        open
+          ? '!bg-primary !text-primary-foreground hover:!bg-primary/90 focus:!bg-primary focus:!text-primary-foreground focus-visible:!bg-primary focus-visible:!text-primary-foreground'
+          : '!bg-background !text-foreground hover:!bg-accent focus:!bg-background focus:!text-foreground focus-visible:!bg-background focus-visible:!text-foreground'
+      }`}
+      title={open ? 'RAG Documents enabled' : 'RAG Documents disabled'}
+    >
+      <FileTextIcon size={14} />
+    </Button>
+  );
 }
 
 const RagDocumentsButton = memo(PureRagDocumentsButton);

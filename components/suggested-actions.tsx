@@ -47,7 +47,7 @@ function PureSuggestedActions({
                 parts: [{ type: 'text', text: suggestion }],
               });
             }}
-            className="text-left w-full h-auto whitespace-normal p-3"
+            className="text-left w-full h-auto whitespace-normal p-4"
           >
             {suggestedAction}
           </Suggestion>

@@ -5,7 +5,9 @@ import {
   smoothStream,
   stepCountIs,
   streamText,
+  tool,
 } from 'ai';
+import { z } from 'zod';
 import { auth, type UserType } from '@/app/(auth)/auth';
 import { type RequestHints, systemPrompt } from '@/lib/ai/prompts';
 import {
@@ -23,7 +25,6 @@ import { createDocument } from '@/lib/ai/tools/create-document';
 import { updateDocument } from '@/lib/ai/tools/update-document';
 import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
-import { kgSearch } from '@/lib/ai/tools/kg-search';
 import { searchRelevantChunks } from '@/lib/rag/utils';
 import { isProductionEnvironment } from '@/lib/constants';
 import { myProvider } from '@/lib/ai/providers';
@@ -80,12 +81,15 @@ export async function POST(request: Request) {
       message,
       selectedChatModel,
       selectedVisibilityType,
+      kgSearchEnabled,
     }: {
       id: string;
       message: ChatMessage;
       selectedChatModel: ChatModel['id'];
       selectedVisibilityType: VisibilityType;
+      kgSearchEnabled: boolean;
     } = requestBody;
+    console.log('🔧 API Route - received kgSearchEnabled:', kgSearchEnabled);
 
     const session = await auth();
 
@@ -189,19 +193,27 @@ export async function POST(request: Request) {
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
           system:
-            systemPrompt({ selectedChatModel, requestHints }) + ragContext,
+            systemPrompt({ selectedChatModel, requestHints, kgSearchEnabled }) +
+            ragContext,
           messages: convertToModelMessages(uiMessages),
           stopWhen: stepCountIs(5),
           experimental_activeTools:
             selectedChatModel === 'chat-model-reasoning'
               ? []
-              : [
-                  'getWeather',
-                  'createDocument',
-                  'updateDocument',
-                  'requestSuggestions',
-                  'kgSearch',
-                ],
+              : kgSearchEnabled
+                ? [
+                    'getWeather',
+                    'createDocument',
+                    'updateDocument',
+                    'requestSuggestions',
+                    'kgSearch',
+                  ]
+                : [
+                    'getWeather',
+                    'createDocument',
+                    'updateDocument',
+                    'requestSuggestions',
+                  ],
           experimental_transform: smoothStream({ chunking: 'word' }),
           tools: {
             getWeather,
@@ -211,7 +223,108 @@ export async function POST(request: Request) {
               session,
               dataStream,
             }),
-            kgSearch,
+            ...(kgSearchEnabled
+              ? {
+                  kgSearch: tool({
+                    description:
+                      'Search the biomedical knowledge graph for entities, relationships, and contextual information. Use this when users ask about biomedical concepts, diseases, drugs, proteins, or biological processes.',
+                    inputSchema: z.object({
+                      query: z
+                        .string()
+                        .describe(
+                          'The search query for biomedical entities or concepts',
+                        ),
+                      limit: z
+                        .number()
+                        .optional()
+                        .describe(
+                          'Maximum number of entities to return (default: 5)',
+                        ),
+                    }),
+                    execute: async ({ query, limit = 5 }) => {
+                      // Use the original kgSearch tool logic
+                      const { kgService } = await import(
+                        '@/lib/neo4j/kg-service'
+                      );
+
+                      try {
+                        console.log(
+                          '🔍 KG Search tool called with query:',
+                          query,
+                        );
+                        console.log('🧬 KNOWLEDGE GRAPH SEARCH ACTIVATED!');
+
+                        // Ensure limit is always an integer
+                        const intLimit = Math.floor(Number(limit));
+                        console.log(
+                          '🔢 Using limit:',
+                          intLimit,
+                          'type:',
+                          typeof intLimit,
+                        );
+
+                        // Search for entities in the knowledge graph
+                        const entities = await kgService.searchEntities(
+                          query,
+                          intLimit,
+                        );
+                        console.log(
+                          '🔍 Raw entities from kgService:',
+                          JSON.stringify(entities, null, 2),
+                        );
+
+                        // Get relationships for found entities
+                        const relationships: any[] = [];
+                        if (entities.length > 0) {
+                          for (const entity of entities.slice(0, 3)) {
+                            // Limit to first 3 entities
+                            console.log(
+                              `🔗 Searching relationships for entity ID: ${entity.id} (${entity.properties.name})`,
+                            );
+                            const entityRelationships =
+                              await kgService.getRelationships(
+                                entity.id,
+                                intLimit,
+                              );
+                            console.log(
+                              `🔗 Found ${entityRelationships.length} relationships for ${entity.properties.name}`,
+                            );
+                            if (entityRelationships.length > 0) {
+                              console.log(
+                                '🔗 Raw relationship data:',
+                                JSON.stringify(entityRelationships, null, 2),
+                              );
+                              relationships.push(...entityRelationships);
+                            }
+                          }
+                        }
+
+                        // Get graph statistics
+                        const stats = await kgService.getGraphStats();
+                        console.log('📈 Graph stats:', stats);
+
+                        return {
+                          query,
+                          entities,
+                          relationships,
+                          stats,
+                          timestamp: new Date().toISOString(),
+                        };
+                      } catch (error) {
+                        console.error('Error in KG search:', error);
+                        return {
+                          error: 'Failed to search knowledge graph',
+                          query,
+                          entities: [],
+                          relationships: [],
+                          stats: null,
+                          timestamp: new Date().toISOString(),
+                        };
+                      }
+                    },
+                  }),
+                }
+              : {}),
           },
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,

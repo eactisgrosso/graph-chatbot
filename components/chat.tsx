@@ -2,7 +2,7 @@
 
 import { DefaultChatTransport } from 'ai';
 import { useChat } from '@ai-sdk/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { ChatHeader } from '@/components/chat-header';
 import type { Vote } from '@/lib/db/schema';
@@ -49,6 +49,35 @@ export function Chat({
   const { setDataStream } = useDataStream();
 
   const [input, setInput] = useState<string>('');
+  const [kgSearchEnabled, setKgSearchEnabled] = useState<boolean>(true);
+  console.log('🔧 Chat Component - kgSearchEnabled:', kgSearchEnabled);
+
+  // Use ref to store current value for transport
+  const kgSearchEnabledRef = useRef(kgSearchEnabled);
+  kgSearchEnabledRef.current = kgSearchEnabled;
+
+  // Create transport that uses ref for current value
+  const transport = useMemo(() => {
+    console.log('🔧 Creating transport (will use ref for current value)');
+    return new DefaultChatTransport({
+      api: '/api/chat',
+      fetch: fetchWithErrorHandlers,
+      prepareSendMessagesRequest({ messages, id, body }) {
+        const currentValue = kgSearchEnabledRef.current;
+        console.log('🔧 Transport - sending kgSearchEnabled:', currentValue);
+        return {
+          body: {
+            id,
+            message: messages.at(-1),
+            selectedChatModel: initialChatModel,
+            selectedVisibilityType: visibilityType,
+            kgSearchEnabled: currentValue,
+            ...body,
+          },
+        };
+      },
+    });
+  }, [initialChatModel, visibilityType]); // Remove kgSearchEnabled from dependencies
 
   const {
     messages,
@@ -63,21 +92,7 @@ export function Chat({
     messages: initialMessages,
     experimental_throttle: 100,
     generateId: generateUUID,
-    transport: new DefaultChatTransport({
-      api: '/api/chat',
-      fetch: fetchWithErrorHandlers,
-      prepareSendMessagesRequest({ messages, id, body }) {
-        return {
-          body: {
-            id,
-            message: messages.at(-1),
-            selectedChatModel: initialChatModel,
-            selectedVisibilityType: visibilityType,
-            ...body,
-          },
-        };
-      },
-    }),
+    transport,
     onData: (dataPart) => {
       setDataStream((ds) => (ds ? [...ds, dataPart] : []));
     },
@@ -168,6 +183,8 @@ export function Chat({
               sendMessage={sendMessage}
               selectedVisibilityType={visibilityType}
               selectedModelId={initialChatModel}
+              kgSearchEnabled={kgSearchEnabled}
+              setKgSearchEnabled={setKgSearchEnabled}
             />
           )}
         </div>
