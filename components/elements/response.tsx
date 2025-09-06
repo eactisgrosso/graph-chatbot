@@ -8,18 +8,29 @@ type ResponseProps = ComponentProps<typeof Streamdown>;
 
 // Citation processing function
 function processCitations(text: string) {
-  const citationPattern = /\[Source:\s*([^\]]+)\]/g;
+  const sourcePattern = /\[Source:\s*([^\]]+)\]/g;
+  const kgPattern = /\[Knowledge Graph:\s*([^\]]+)\]/g;
   const sources: string[] = [];
   const citationMap = new Map<string, number>();
   let citationIndex = 1;
 
-  // Find all citations and create a map
+  // Find all source citations and create a map
   let match: RegExpExecArray | null;
-  while ((match = citationPattern.exec(text)) !== null) {
+  while ((match = sourcePattern.exec(text)) !== null) {
     const sourceName = match[1];
     if (!citationMap.has(sourceName)) {
       citationMap.set(sourceName, citationIndex++);
       sources.push(sourceName);
+    }
+  }
+
+  // Find all knowledge graph citations and create a map
+  kgPattern.lastIndex = 0; // Reset regex state
+  while ((match = kgPattern.exec(text)) !== null) {
+    const kgName = match[1];
+    if (!citationMap.has(kgName)) {
+      citationMap.set(kgName, citationIndex++);
+      sources.push(kgName);
     }
   }
 
@@ -30,11 +41,19 @@ function processCitations(text: string) {
   // Replace citations with numbered references
   let processedText = text;
   citationMap.forEach((index, sourceName) => {
-    const citationRegex = new RegExp(
+    // Replace source citations
+    const sourceRegex = new RegExp(
       `\\[Source:\\s*${sourceName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`,
       'g',
     );
-    processedText = processedText.replace(citationRegex, `[${index}]`);
+    processedText = processedText.replace(sourceRegex, `[${index}]`);
+
+    // Replace knowledge graph citations
+    const kgRegex = new RegExp(
+      `\\[Knowledge Graph:\\s*${sourceName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`,
+      'g',
+    );
+    processedText = processedText.replace(kgRegex, `[${index}]`);
   });
 
   return { processedText, sources };
@@ -43,7 +62,10 @@ function processCitations(text: string) {
 export const Response = memo(
   ({ className, children, ...props }: ResponseProps) => {
     // Only process citations if the text contains citation patterns
-    if (typeof children === 'string' && children.includes('[Source:')) {
+    if (
+      typeof children === 'string' &&
+      (children.includes('[Source:') || children.includes('[Knowledge Graph:'))
+    ) {
       const { processedText, sources } = processCitations(children);
 
       return (

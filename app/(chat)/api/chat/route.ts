@@ -23,6 +23,7 @@ import { createDocument } from '@/lib/ai/tools/create-document';
 import { updateDocument } from '@/lib/ai/tools/update-document';
 import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
+import { kgSearch } from '@/lib/ai/tools/kg-search';
 import { searchRelevantChunks } from '@/lib/rag/utils';
 import { isProductionEnvironment } from '@/lib/constants';
 import { myProvider } from '@/lib/ai/providers';
@@ -199,6 +200,7 @@ export async function POST(request: Request) {
                   'createDocument',
                   'updateDocument',
                   'requestSuggestions',
+                  'kgSearch',
                 ],
           experimental_transform: smoothStream({ chunking: 'word' }),
           tools: {
@@ -209,6 +211,7 @@ export async function POST(request: Request) {
               session,
               dataStream,
             }),
+            kgSearch,
           },
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,

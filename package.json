@@ -15,7 +15,11 @@
     "db:push": "drizzle-kit push",
     "db:pull": "drizzle-kit pull",
     "db:check": "drizzle-kit check",
-    "db:up": "drizzle-kit up",
+    "db:up": "docker-compose up -d",
+    "kg:populate": "npx tsx lib/neo4j/scripts/populate-test-data.ts",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
     "test": "export PLAYWRIGHT=True && pnpm exec playwright test"
   },
   "dependencies": {
@@ -70,6 +74,7 @@
     "gpt-tokenizer": "^3.0.1",
     "lucide-react": "^0.446.0",
     "nanoid": "^5.0.8",
+    "neo4j-driver": "^5.28.1",
     "next": "15.3.0-canary.31",
     "next-auth": "5.0.0-beta.25",
     "next-themes": "^0.3.0",

@@ -279,6 +279,12 @@ const PurePreviewMessage = ({
                   </Tool>
                 );
               }
+
+              if (type === 'tool-kgSearch') {
+                // Hide the KG tool usage indicator completely
+                // The knowledge graph reference will appear at the end of the AI's answer
+                return null;
+              }
             })}
 
             {!isReadonly && (
